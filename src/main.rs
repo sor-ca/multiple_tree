@@ -38,6 +38,10 @@ impl Element {
         self.children.push(id);
     }
 
+    fn add_traj(&mut self, id: usize) {
+        self.trajs.push(id);
+    }
+
     fn add_point(&mut self, point: i32) {
         self.path.push(point);
     }
@@ -105,7 +109,7 @@ pub fn branch_vector(trajs: &Vec<Traj>) -> HashMap<usize, HashElement> {
                     if let Some(traj) = trajs.get(*traj_id) {
                         if let Some(point) = traj.path.get(index) {
                             match new_parents.get_mut(point) {
-                                Some(el) => el.trajs.push(*traj_id),
+                                Some(el) => el.add_traj(*traj_id), //el.trajs.push(*traj_id),
                                 None => {
                                     new_parents.insert(
                                         *point,
