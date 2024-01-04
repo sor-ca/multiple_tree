@@ -1,3 +1,6 @@
+//some good ideas about multiple trees
+//https://developerlife.com/2022/02/24/rust-non-binary-tree/
+
 use std::collections::HashMap;
 
 use r3bl_rs_utils::Arena;
@@ -7,17 +10,65 @@ pub struct Traj {
     pub path: Vec<i32>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct Element {
     pub id: usize,
     pub path: Vec<i32>,
     pub trajs: Vec<usize>,
-    pub parent: usize,
+    pub parent: Option<usize>,
     pub children:  Vec<usize>,
 }
 
-pub fn branch_vector(trajs: &Vec<Traj>) -> Vec<Element> {
-    let mut final_vec: Vec<Element> = Vec::with_capacity(100);
+impl Element {
+    fn new(id: usize) -> Self {
+        Self {
+            id,
+            path: vec![],
+            trajs: vec![],
+            parent: None,
+            children:  vec![],
+        }
+    }
+
+    fn set_parent(&mut self, id: usize) {
+        self.parent = Some(id);
+    }
+
+    fn add_child(&mut self, id: usize) {
+        self.children.push(id);
+    }
+
+    fn add_point(&mut self, point: i32) {
+        self.path.push(point);
+    }
+
+    fn add_children(&mut self, children: &mut Vec<usize>) {
+        self.children.append(children);
+    }
+}
+
+pub struct HashElement {
+    pub path: Vec<i32>,
+    pub trajs: Vec<usize>,
+    pub parent: Option<usize>,
+    pub children:  Vec<usize>,
+}
+
+impl From<Element> for HashElement {
+    fn from(value: Element) -> Self {
+        Self {
+            path: value.path,
+            trajs: value.trajs,
+            parent: value.parent,
+            children: value.children,
+        }
+    }
+}
+
+
+
+pub fn branch_vector(trajs: &Vec<Traj>) -> HashMap<usize, HashElement> {
+    let mut hash_tree: HashMap<usize, HashElement> = HashMap::new();
 
     if !trajs.is_empty() {
         let max_len = trajs
@@ -31,7 +82,7 @@ pub fn branch_vector(trajs: &Vec<Traj>) -> Vec<Element> {
 
         let null_parent = Element {
             id: 0,
-            parent: 0,
+            parent: None,
             path: vec![],
             trajs: vec![0, 1, 2, 3],
             children: vec![],
@@ -42,7 +93,7 @@ pub fn branch_vector(trajs: &Vec<Traj>) -> Vec<Element> {
         let mut count = 1usize;
 
         for index in 0..max_len {
-            //vector of id for pushing from active parents to final vector
+            //vector of id for pushing from active parents to hash_tree
             let mut push_to_final = vec![];
             let len = active_parents.len();
 
@@ -60,7 +111,7 @@ pub fn branch_vector(trajs: &Vec<Traj>) -> Vec<Element> {
                                         *point,
                                         Element {
                                             id: count,
-                                            parent: active_parents[i].id,
+                                            parent: Some(active_parents[i].id),
                                             path: vec![*point],
                                             trajs: vec![*traj_id],
                                             children: vec![],
@@ -79,16 +130,18 @@ pub fn branch_vector(trajs: &Vec<Traj>) -> Vec<Element> {
                     }
                     1 => {
                         //the i-th element of all the trajs if this parent is the same
-                        active_parents[i]
-                            .path
-                            .push(new_parents.into_keys().next().unwrap());
+                        let point = new_parents.into_keys().next().unwrap();
+                        active_parents[i].add_point(point);
+                            //.path
+                            //.push(new_parents.into_keys().next().unwrap());
                         count -= 1;
                     }
                     _ => {
                         //several new children
                         let mut children: Vec<_> = new_parents.into_values().collect();
-                        let children_ids = children.iter().map(|ch|ch.id).collect();
-                        active_parents[i].children = children_ids;
+                        let mut children_ids = children.iter().map(|ch|ch.id).collect();
+                        //active_parents[i].children = children_ids;
+                        active_parents[i].add_children(&mut children_ids);
                         active_parents.append(&mut children);
                         push_to_final.push(i);
                     }
@@ -97,14 +150,16 @@ pub fn branch_vector(trajs: &Vec<Traj>) -> Vec<Element> {
             //reverse vector to keep the correct indexes after removing
             push_to_final.reverse();
             for i in push_to_final {
-                let final_el = active_parents.remove(i);
-                final_vec.push(final_el);
+                let el = active_parents.remove(i);
+                hash_tree.insert(el.id, el.into());
             }
         }
-        final_vec.append(&mut active_parents);
+        for el in active_parents.into_iter() {
+            hash_tree.insert(el.id, el.into());
+        }
     }
 
-    final_vec
+    hash_tree
 }
 
 #[derive(Clone, Debug)]
