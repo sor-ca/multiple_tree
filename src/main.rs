@@ -1,7 +1,14 @@
 //some good ideas about multiple trees
 //https://developerlife.com/2022/02/24/rust-non-binary-tree/
 
-use std::collections::HashMap;
+//the task is that we have several trajectories which start in one point and then branch, forming a multiple tree
+//we need to create a collection of elements
+//each element includes the path segments between the points of branching 
+//and the numbers of the trajectories which follow this path segment
+//each trajectory has its own path - the sorted collecton of points starting from zero. 
+//In real situation, each path includes several thousands of points
+
+use std::collections::{HashMap, VecDeque};
 
 use r3bl_rs_utils::Arena;
 
@@ -51,6 +58,7 @@ impl Element {
     }
 }
 
+#[derive(Clone, Debug)]
 pub struct HashElement {
     pub path: Vec<i32>,
     pub trajs: Vec<usize>,
@@ -68,8 +76,6 @@ impl From<Element> for HashElement {
         }
     }
 }
-
-
 
 pub fn branch_vector(trajs: &Vec<Traj>) -> HashMap<usize, HashElement> {
     let mut hash_tree: HashMap<usize, HashElement> = HashMap::new();
@@ -136,15 +142,12 @@ pub fn branch_vector(trajs: &Vec<Traj>) -> HashMap<usize, HashElement> {
                         //the i-th element of all the trajs if this parent is the same
                         let point = new_parents.into_keys().next().unwrap();
                         active_parents[i].add_point(point);
-                            //.path
-                            //.push(new_parents.into_keys().next().unwrap());
                         count -= 1;
                     }
                     _ => {
                         //several new children
                         let mut children: Vec<_> = new_parents.into_values().collect();
                         let mut children_ids = children.iter().map(|ch|ch.id).collect();
-                        //active_parents[i].children = children_ids;
                         active_parents[i].add_children(&mut children_ids);
                         active_parents.append(&mut children);
                         push_to_final.push(i);
@@ -164,6 +167,35 @@ pub fn branch_vector(trajs: &Vec<Traj>) -> HashMap<usize, HashElement> {
     }
 
     hash_tree
+}
+
+//from Arena sources, adapted for hash map
+//[DFS graph walking](https://developerlife.com/2018/08/16/algorithms-in-kotlin-5/)
+//[DFS tree walking](https://stephenweiss.dev/algorithms-depth-first-search-dfs#handling-non-binary-trees)
+pub fn tree_walk_dfs_for_hash_tree(hash_tree: &HashMap<usize, HashElement>, node_id: usize) -> Option<VecDeque<usize>> {
+    if !hash_tree.contains_key(&node_id) {
+        return None;
+    }
+
+    let mut stack: VecDeque<usize> = VecDeque::from([node_id]);
+    let mut it: VecDeque<usize> = VecDeque::new();
+
+    while let Some(node_id) = stack.pop_back() {
+        let node = hash_tree.get(&node_id)?;
+        dbg!(&node);
+        it.push_back(node_id);
+        // Note that the children ordering has to be flipped! You want to perform the
+        // traversal from RIGHT -> LEFT (not LEFT -> RIGHT).
+        // PTAL: <https://developerlife.com/assets/algo-ts-2-images/depth-first-search.svg>
+        for child_id in node.children.iter().rev() {
+                stack.push_back(*child_id);
+        }
+    }
+
+    match it.len() {
+        0 => None,
+        _ => Some(it),
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -272,9 +304,10 @@ fn main() {
         },
     ];
 
-    let vec = branch_vector(&trajs);
-    dbg!(&vec.len());
+    let hash_tree = branch_vector(&trajs);
+    //dbg!(&hash_tree.len());
+    dbg!(tree_walk_dfs_for_hash_tree(&hash_tree, 0));
 
-    let arena = arena_tree(&trajs);
-    dbg!(&arena.tree_walk_dfs(0).unwrap());
+    //let arena = arena_tree(&trajs);
+    //dbg!(&arena.tree_walk_dfs(0).unwrap());
 }
